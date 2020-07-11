@@ -1,0 +1,280 @@
+#include <stdio.h>
+#include <pthread.h>
+#include <string.h>
+#include <semaphore.h>
+#include <signal.h>
+#include <stdlib.h>
+pthread_cond_t c[8];
+pthread_mutex_t m[8], knife, glass;
+int cakeVolume=15;// колличество пирога и вина
+int wineVolume=15;
+struct philosophs// структура философа
+ {
+int x,y;
+int dish_x, dish_y;
+char* name;
+ } philos[8];
+void draw_knife(){
+for(int h=14;h<19;h++){printf("\033[%d;75H\033[1;49;37m@",h);}//правая сторона
+for(int h=14;h<17;h++){printf("\033[%d;74H\033[1;49;37m@",h);}//левая сторона
+}
+void take_knife(){
+for(int h=14;h<19;h++){printf("\033[%d;75H\033[1;49;32m@",h);}//правая сторона
+for(int h=14;h<17;h++){printf("\033[%d;74H\033[1;49;32m@",h);}//левая сторона
+}
+void draw_philosopher(int n, int color,char*w,char*k, int l)
+{
+int length,j;
+// pthread_mutex_lock(&block); //блокируем мьютекс что бы исключить взаимодействие
+нитей друг на друга
+length=strlen(philos[n].name)+2;
+printf("\033[%d;%dH %s ",philos[n].y+1,philos[n].x,philos[n].name, philos[n].dish_x,
+philos[n].dish_y);//выводим имя философа
+printf("\033[%d;%dH\033[49;32m%s",philos[n].y-1,philos[n].x,w);
+printf("\033[%d;%dH\033[49;32m%s",philos[n].dish_y-1,philos[n].dish_x-1,k);
+
+//вывод кол-ва пирога и вина
+if(cakeVolume>0) printf("\033[16;60H\033[1;33;49m%d",cakeVolume);
+else printf("\033[16;60H\033[1;33;49m%d ",cakeVolume);
+if(wineVolume>0) printf("\033[10;42H\033[1;33;49m%d ",wineVolume);
+else printf("\033[10;42H\033[1;33;49m%d ",wineVolume);
+fflush(stdout);
+// pthread_mutex_unlock(&block);// освобождаем мьютекс cs
+}
+// функция показывающая есть ли в тарелках еда или вино
+void eatornot(int n, int colour,char*k, int l){
+int length,j;
+//pthread_mutex_lock(&block); //блокируем мьютекс что бы исключить взаимодействие
+нитей друг на друга
+length=strlen(philos[n].name)+2;
+printf("\033[%d;%dH\033[49;33m%s",philos[n].dish_y-1,philos[n].dish_x-1,k);
+fflush(stdout);
+//pthread_mutex_unlock(&block);// освобождаем мьютекс cs
+}
+// зарисовка вина
+void draw_wine(){
+
+for(int x=42;x<44;x++)
+{
+printf("\033[11;%dH\033[1;49;35m*",x);
+}
+for(int x=42;x<44;x++)
+{
+printf("\033[12;%dH\033[1;49;35m*",x);
+}
+for(int x=40;x<46;x++)
+{
+printf("\033[13;%dH\033[1;49;35m*",x);
+}
+for(int x=40;x<46;x++)
+{
+printf("\033[14;%dH\033[1;49;35m*",x);
+}
+for(int x=40;x<46;x++)
+{
+printf("\033[15;%dH\033[1;49;35m*",x);
+}
+for(int x=40;x<46;x++)
+{
+printf("\033[16;%dH\033[1;49;35m*",x);
+}
+printf("\033[17;40H\033[1;49;35m WINE ");
+}
+// зарисовка пирога
+void draw_cake(){
+for(int f=55;f<65;f++){printf("\033[17;%dH\033[1;49;32m*#*",f);}//основание пирога
+printf("\033[14;55H\033[1;49;32m*#*CAKE*#*");//вверх пирога
+for(int h=14;h<18;h++){printf("\033[%d;55H\033[1;49;32m*#*",h);}//левая сторона
+for(int h=14;h<18;h++){printf("\033[%d;64H\033[1;49;32m*#*",h);}//правая сторона
+}
+/// зарисовка стола
+void draw_table(){
+ for(int a=8;a<27;a++)//левый край стола
+{
+printf("\033[%d;27H\033[1;31;49m*",a);
+}
+ for(int z=28;z<90;z++) //верхний край
+{
+printf("\033[7;%dH\033[1;31;49m*", z);
+}
+ for(int a=8;a<27;a++)//правый край стола
+{
+printf("\033[%d;89H\033[1;31;49m*", a);
+}
+ for(int z=28;z<90;z++)// нижний край стола
+{
+printf("\033[26;%dH\033[1;31;49m*", z);
+}
+}
+// функция отвечающая за то что делает философ
+void whatdophilosopher(void*n)
+{
+int busy,b;
+ int length;
+length=(int)n;
+do
+ {
+draw_philosopher((int)n,31,"Я думаю! ","",length);
+eatornot((int)n,35,"0",length);
+ int think=1+rand()%5;
+ sleep(think);// время которое философ думает о жизни
+ pthread_cond_wait(&c[(int)n],&m[(int)n]);
+ //ожидаем сигнал для философа о том что он проголодался
+
+ draw_philosopher((int)n,31,"Хочу пирог! Дайте нож!","",length); //Философ захотел
+есть
+
+ eatornot((int)n,35,"0",length);
+ //take_knife();
+
+ sleep( think);
+
+
+ if(cakeVolume>0){
+ busy=pthread_mutex_lock(&knife); // взял нож
+ take_knife();// взял нож нож поменяет цвет
+ sleep(think);
+ cakeVolume--;// отрезал пирог
+
+ draw_philosopher((int)n,31,"МММ...КАК ВКУСНЕНЬКО!!!!", "",length);// ест пирог
+ eatornot((int)n,35,"1",length);// в тарелке показывается что пирог есть
+ int eat=2+rand()%5;// время пока ест
+ sleep(eat);
+ pthread_mutex_unlock(&knife);// освободил нож
+ }
+ draw_knife();
+ // pthread_cond_wait(&c[(int)n],&m[(int)n]); //ожидаем сигнал для философа о том что он
+проголодался
+
+ draw_philosopher((int)n,31,"Хочу пить!Дайте Бокал! ","",length); // попить
+eatornot((int)n,35,"0",length);// в чашке пусто
+
+ b=pthread_mutex_lock(&glass); // вино уфилософа -занято
+ if(wineVolume>0){
+
+ wineVolume--;// налил себе вино
+ draw_philosopher((int)n,31,"ПРЕВОСХОДНОЕ ВИНО!!!! ","",length);
+
+
+eatornot((int)n,35,"1",length);//в чашке есть вино
+ int drink=2+rand()%5;
+ // задержка отображает время отрезания и поедания пирога
+ sleep(drink);
+ pthread_mutex_unlock(&glass);// вино свободно
+ } 
+} while(cakeVolume>0 && wineVolume>0);
+}
+int main(){
+printf("\033[1;39;49m \033[2J\n");
+
+pthread_t nit[8]; //Объявление идентификаторов нитей
+do{
+//pthread_mutex_init(&block,NULL);// мьютекс для исключения взаимодействия нитей друг
+на друга
+ pthread_mutex_init(&knife,NULL); // мьютекс нож
+ pthread_mutex_init(&glass,NULL); // мьютекс вино
+philos[0].x=22;
+ philos[0].y=4;
+ philos[0].name="АЛЬФАРАБИ";
+philos[0].dish_x=31;
+ philos[0].dish_y=9;
+ //philos[0].dish_name="АЛЬФАРАБИ";
+for(int f=30;f<33;f++){printf("\033[9;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=8;h<10;h++){printf("\033[%d;29H\033[1;49;36m*",h);}//левая сторона
+for(int h=8;h<10;h++){printf("\033[%d;32H\033[1;49;36m*",h);}//правая сторона
+ philos[1].x=74;
+ philos[1].y=5;
+ philos[1].name="САНКХЬЯ";
+ philos[1].dish_x=78;
+ philos[1].dish_y=9;
+for(int f=76;f<79;f++){printf("\033[9;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=8;h<10;h++){printf("\033[%d;75H\033[1;49;36m*",h);}//левая сторона
+for(int h=8;h<10;h++){printf("\033[%d;78H\033[1;49;36m*",h);}//правая сторона
+ philos[2].x=16;
+ philos[2].y=18;
+ philos[2].name="СЕНЕКА";
+ philos[2].dish_x=31;
+ philos[2].dish_y=19;
+for(int f=30;f<33;f++){printf("\033[19;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=18;h<20;h++){printf("\033[%d;29H\033[1;49;36m*",h);}//левая сторона
+for(int h=18;h<20;h++){printf("\033[%d;32H\033[1;49;36m*",h);}//правая сторона
+ philos[3].x=92;
+ philos[3].y=18;
+ philos[3].name="ПЛАТОН";
+ philos[3].dish_x=86;
+ philos[3].dish_y=19;
+for(int f=85;f<88;f++){printf("\033[19;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=18;h<20;h++){printf("\033[%d;84H\033[1;49;36m*",h);}//левая сторона
+for(int h=18;h<20;h++){printf("\033[%d;87H\033[1;49;36m*",h);}//правая сторона
+ philos[4].x=50;
+ philos[4].y=5;
+ philos[4].name="КОНФУЦИЙ";
+ philos[4].dish_x=55;
+ philos[4].dish_y=9;
+for(int f=54;f<57;f++){printf("\033[9;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=8;h<10;h++){printf("\033[%d;53H\033[1;49;36m*",h);}//левая сторона
+for(int h=8;h<10;h++){printf("\033[%d;56H\033[1;49;36m*",h);}//правая сторона
+ philos[5].x=49;
+ philos[5].y=29;
+ philos[5].name="ФОМА АКВИНСКИЙ";
+ philos[5].dish_x=56;
+ philos[5].dish_y=24;
+ for(int f=54;f<57;f++){printf("\033[24;%dH\033[1;49;36m*",f);}//основание пирога
+ for(int h=23;h<25;h++){printf("\033[%d;53H\033[1;49;36m*",h);}//левая сторона
+ for(int h=23;h<25;h++){printf("\033[%d;56H\033[1;49;36m*",h);}//правая сторона
+ philos[6].x=22;
+ philos[6].y=29;
+ philos[6].name="ЛАО_ЦЗЫ";
+ philos[6].dish_x=33;
+ philos[6].dish_y=24;
+for(int f=32;f<35;f++){printf("\033[24;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=23;h<25;h++){printf("\033[%d;31H\033[1;49;36m*",h);}//левая сторона
+for(int h=23;h<25;h++){printf("\033[%d;34H\033[1;49;36m*",h);}//правая сторона
+ philos[7].x=74;
+ philos[7].y=29;
+ philos[7].name="ДЖЭК-МА";
+ philos[7].dish_x=78;
+ philos[7].dish_y=24;
+
+for(int f=76;f<79;f++){printf("\033[24;%dH\033[1;49;36m*",f);}//основание пирога
+for(int h=23;h<25;h++){printf("\033[%d;75H\033[1;49;36m*",h);}//левая сторона
+ for(int h=23;h<25;h++){printf("\033[%d;78H\033[1;49;36m*",h);}//правая сторона
+draw_table();
+draw_cake();
+draw_wine();
+draw_knife();
+for(int i=0; i<8; i++)
+{
+pthread_cond_init(&c[i],NULL);
+pthread_mutex_init(&m[i],NULL);
+pthread_mutex_lock(&m[i]);
+pthread_create(&nit[i],NULL,(void*)whatdophilosopher,(void*)(i));// запуск нитей, которые
+выполняют одну процедуру
+usleep(50000);
+}
+if(cakeVolume!=0 && wineVolume!=0)
+ {
+ for(;;){
+ for( int i=0; i<8; i++){
+ sleep(5);
+ pthread_cond_signal(&c[i]);
+ // отправляется сигнал философу о том, что он проголодался
+ sleep(5);
+ if(cakeVolume==0 && wineVolume==0)
+
+{exit(1);}
+ }
+}}
+
+} while(cakeVolume!=0 && wineVolume!=0);
+for ( int i=0;i<8;i++)//уничтожение нитей и мьютексов
+ {
+ pthread_kill(nit[i],SIGTERM);// уничтожение нитей
+ pthread_cond_destroy(&c[i]);
+ pthread_mutex_destroy(&m[i]);// уничтож мьютекса
+ }
+ pthread_mutex_destroy(&knife);//уничтожаются мьютексы
+ pthread_mutex_destroy(&glass);//вина и пирога
+ // pthread_mutex_destroy(&block);
+ return 0;
+}
